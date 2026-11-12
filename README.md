@@ -44,8 +44,8 @@
 
     <header>
         <div>
-            <h1 style="margin:0; font-size: 18px;">Controle Geral de Validades</h1>
-            <p style="margin:2px 0 0 0; font-size: 11px; color: #a7f3d0;">Supermercado Mundial — Lojas & Retaguarda</p>
+            <h1 style="margin:0; font-size: 18px;">Controle Geral de Validades & Lotes</h1>
+            <p style="margin:2px 0 0 0; font-size: 11px; color: #a7f3d0;">Supermercado Mundial — Lojas & Depósito</p>
         </div>
         <button onclick="gerarRelatorioPDF()" class="btn btn-pdf">
             <i class="fa-solid fa-file-pdf"></i> Relatório PDF (Críticos / ≤ 5 dias)
@@ -77,11 +77,11 @@
         <!-- Ação de Cadastro -->
         <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
-                <h3 style="margin:0; font-size: 15px; color: #334155;">Produtos Cadastrados na Loja</h3>
-                <p style="margin:2px 0 0 0; font-size: 12px; color: #64748b;">Lista unificada de todos os setores</p>
+                <h3 style="margin:0; font-size: 15px; color: #334155;">Produtos e Lotes Cadastrados</h3>
+                <p style="margin:2px 0 0 0; font-size: 12px; color: #64748b;">Lista unificada de controle</p>
             </div>
             <button onclick="abrirModalNovo()" class="btn" style="width: 100%; max-width: 280px; justify-content: center;">
-                <i class="fa-solid fa-plus-circle"></i> Conferir Validade (Câmera / Manual)
+                <i class="fa-solid fa-plus-circle"></i> Registrar Lote / Validade
             </button>
         </div>
 
@@ -92,6 +92,7 @@
                     <tr>
                         <th>Produto / EAN</th>
                         <th>Setor</th>
+                        <th>Lote</th>
                         <th>Validade</th>
                         <th>Status</th>
                         <th>Ação de Retirada</th>
@@ -109,7 +110,7 @@
     <div id="modal-produto" class="modal">
         <div class="modal-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin:0; font-size: 16px;">Conferir Validade do Produto</h3>
+                <h3 style="margin:0; font-size: 16px;">Registrar Lote e Validade</h3>
                 <button onclick="fecharModal()" style="background:none; border:none; font-size: 18px; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
@@ -142,13 +143,17 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Validade</label>
-                        <input type="date" id="input-validade" required class="form-control">
+                        <label>Nº do Lote</label>
+                        <input type="text" id="input-lote" class="form-control" placeholder="Ex: L-042" style="text-transform: uppercase;">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Data de Validade</label>
+                    <input type="date" id="input-validade" required class="form-control">
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 16px;">
                     <button type="button" onclick="fecharModal()" class="btn-filter" style="background:#f1f5f9; color:#475569; border:none; padding:10px 16px; border-radius:8px; font-weight:600; cursor:pointer;">Cancelar</button>
-                    <button type="submit" class="btn">Salvar Validade</button>
+                    <button type="submit" class="btn">Salvar Registro</button>
                 </div>
             </form>
         </div>
@@ -175,21 +180,21 @@
 
         let produtos = [];
         try {
-            const salvo = localStorage.getItem('mundial_validades_produtos_geral');
+            const salvo = localStorage.getItem('mundial_validades_lotes_v1');
             if (salvo) produtos = JSON.parse(salvo);
         } catch (e) { console.error(e); }
 
         if (!produtos || produtos.length === 0) {
             produtos = [
-                { id: 1, ean: "7891000123456", nome: "Pão de Forma Integral 500g", setor: "Padaria", validade: criarDataRelativa(4) },
-                { id: 2, ean: "7891000654321", nome: "Queijo Minas Frescal 500g", setor: "Laticínios", validade: criarDataRelativa(0) },
-                { id: 3, ean: "7891000987654", nome: "Carne Moída Bovina (KG)", setor: "Açougue", validade: criarDataRelativa(2) }
+                { id: 1, ean: "7891000123456", nome: "Pão de Forma Integral 500g", setor: "Padaria", lote: "LOTE-10A", validade: criarDataRelativa(4) },
+                { id: 2, ean: "7891000654321", nome: "Queijo Minas Frescal 500g", setor: "Laticínios", lote: "LAT-88B", validade: criarDataRelativa(0) },
+                { id: 3, ean: "7891000987654", nome: "Carne Moída Bovina (KG)", setor: "Açougue", lote: "ACQ-02", validade: criarDataRelativa(2) }
             ];
         }
 
         let catalogoEAN = {};
         try {
-            const catalogoSalvo = localStorage.getItem('mundial_catalogo_ean_geral');
+            const catalogoSalvo = localStorage.getItem('mundial_catalogo_ean_lotes_v1');
             if (catalogoSalvo) {
                 catalogoEAN = JSON.parse(catalogoSalvo);
             } else {
@@ -203,8 +208,8 @@
 
         function salvarNoLocalStorage() {
             try { 
-                localStorage.setItem('mundial_validades_produtos_geral', JSON.stringify(produtos));
-                localStorage.setItem('mundial_catalogo_ean_geral', JSON.stringify(catalogoEAN));
+                localStorage.setItem('mundial_validades_lotes_v1', JSON.stringify(produtos));
+                localStorage.setItem('mundial_catalogo_ean_lotes_v1', JSON.stringify(catalogoEAN));
             } catch (e) {}
         }
 
@@ -238,7 +243,6 @@
             tbody.innerHTML = '';
             let total = 0, warning = 0, today = 0, expired = 0;
 
-            // Ordena os produtos por proximidade de validade (mais urgentes primeiro)
             produtos.sort((a, b) => new Date(a.validade) - new Date(b.validade));
 
             produtos.forEach(p => {
@@ -252,6 +256,7 @@
                     <tr>
                         <td><strong>${p.nome}</strong><br><small style="color:#64748b;">EAN: ${p.ean || 'N/D'}</small></td>
                         <td><span style="background:#f1f5f9; padding:4px 8px; border-radius:6px; font-size:12px;">${p.setor}</span></td>
+                        <td style="font-family:monospace; font-weight:600; color:#334155;">${p.lote || 'S/ Lote'}</td>
                         <td>${formatarData(p.validade)}</td>
                         <td><span class="badge ${status.classe}">${status.texto}</span></td>
                         <td style="font-size:12px; color:#475569;"><i class="fa-solid fa-tag" style="color:#dc2626;"></i> ${status.acao}</td>
@@ -343,6 +348,7 @@
             const eanVal = document.getElementById('input-ean').value.trim() || 'SEM-EAN';
             const nomeVal = document.getElementById('input-nome').value.trim();
             const setorVal = document.getElementById('input-setor').value;
+            const loteVal = document.getElementById('input-lote').value.trim().toUpperCase() || 'S/ LOTE';
 
             if (eanVal !== 'SEM-EAN') {
                 catalogoEAN[eanVal] = { nome: nomeVal, setor: setorVal };
@@ -355,6 +361,7 @@
                 ean: eanVal,
                 nome: nomeVal,
                 setor: setorVal,
+                lote: loteVal,
                 validade: document.getElementById('input-validade').value
             });
 
@@ -391,6 +398,7 @@
                     <tr>
                         <td><b>${p.nome}</b><br><small>EAN: ${p.ean || 'N/D'}</small></td>
                         <td>${p.setor}</td>
+                        <td><b>${p.lote || 'S/ Lote'}</b></td>
                         <td>${formatarData(p.validade)}</td>
                         <td style="color: #dc2626; font-weight: bold;">${status.texto} — <i>${status.acao}</i></td>
                     </tr>
@@ -400,7 +408,7 @@
             let htmlConteudo = `
                 <html>
                 <head>
-                    <title>Relatório de Validades - Ação de Retirada (≤ 5 Dias)</title>
+                    <title>Relatório de Validades e Lotes - Ação de Retirada (≤ 5 Dias)</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
                         h2 { color: #047857; margin-bottom: 5px; }
@@ -411,13 +419,14 @@
                     </style>
                 </head>
                 <body>
-                    <h2>Supermercado Mundial - Lista Geral de Retirada (Janela de 5 Dias)</h2>
-                    <p>Itens que atingiram o prazo limite de remoção da área de venda - Emitido em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+                    <h2>Supermercado Mundial - Lista de Retirada por Lote e Validade</h2>
+                    <p>Itens críticos (vencidos, vencem hoje ou na janela de 5 dias) - Emitido em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
                     <table>
                         <thead>
                             <tr>
                                 <th>Produto</th>
                                 <th>Setor</th>
+                                <th>Lote</th>
                                 <th>Validade</th>
                                 <th>Status / Ação Recomendada</th>
                             </tr>
