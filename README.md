@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Biblioteca Html5-Qrcode para leitura por câmera -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Firebase SDKs (Banco de dados em tempo real) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
         header { background-color: #047857; color: white; padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -45,7 +48,7 @@
     <header>
         <div>
             <h1 style="margin:0; font-size: 18px;">Controle Geral de Validades & Lotes</h1>
-            <p style="margin:2px 0 0 0; font-size: 11px; color: #a7f3d0;">Supermercado Mundial — Lojas & Depósito</p>
+            <p style="margin:2px 0 0 0; font-size: 11px; color: #a7f3d0;">Supermercado Mundial — Lojas & Depósito (Online)</p>
         </div>
         <button onclick="gerarRelatorioPDF()" class="btn btn-pdf">
             <i class="fa-solid fa-file-pdf"></i> Relatório PDF (Críticos / ≤ 5 dias)
@@ -77,8 +80,8 @@
         <!-- Ação de Cadastro -->
         <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
-                <h3 style="margin:0; font-size: 15px; color: #334155;">Produtos e Lotes Cadastrados</h3>
-                <p style="margin:2px 0 0 0; font-size: 12px; color: #64748b;">Lista unificada de controle</p>
+                <h3 style="margin:0; font-size: 15px; color: #334155;">Produtos e Lotes na Nuvem</h3>
+                <p style="margin:2px 0 0 0; font-size: 12px; color: #64748b;">Sincronizado em tempo real</p>
             </div>
             <button onclick="abrirModalNovo()" class="btn" style="width: 100%; max-width: 280px; justify-content: center;">
                 <i class="fa-solid fa-plus-circle"></i> Registrar Lote / Validade
@@ -100,7 +103,7 @@
                     </tr>
                 </thead>
                 <tbody id="tabela-produtos">
-                    <!-- Preenchido via JS -->
+                    <tr><td colspan="7" style="text-align:center; color:#64748b; padding:20px;">Carregando dados da nuvem...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -152,18 +155,27 @@
                     <input type="date" id="input-validade" required class="form-control">
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 16px;">
-                    <button type="button" onclick="fecharModal()" class="btn-filter" style="background:#f1f5f9; color:#475569; border:none; padding:10px 16px; border-radius:8px; font-weight:600; cursor:pointer;">Cancelar</button>
+                    <button type="button" onclick="fecharModal()" style="background:#f1f5f9; color:#475569; border:none; padding:10px 16px; border-radius:8px; font-weight:600; cursor:pointer;">Cancelar</button>
                     <button type="submit" class="btn">Salvar Registro</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Script -->
+    <!-- Script de Integração com Firebase -->
     <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            databaseURL: "https://validade-mundial-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         const hoje = new Date();
         let html5QrCode = null;
         let cameraLigada = false;
+        let produtos = [];
+        let catalogoEAN = {};
 
         function formatarData(dataStr) {
             if (!dataStr) return '';
@@ -172,46 +184,25 @@
             return `${partes[2]}/${partes[1]}/${partes[0]}`;
         }
 
-        function criarDataRelativa(diasOffset) {
-            const d = new Date();
-            d.setDate(hoje.getDate() + diasOffset);
-            return d.toISOString().split('T')[0];
-        }
-
-        let produtos = [];
-        try {
-            const salvo = localStorage.getItem('mundial_validades_lotes_v1');
-            if (salvo) produtos = JSON.parse(salvo);
-        } catch (e) { console.error(e); }
-
-        if (!produtos || produtos.length === 0) {
-            produtos = [
-                { id: 1, ean: "7891000123456", nome: "Pão de Forma Integral 500g", setor: "Padaria", lote: "LOTE-10A", validade: criarDataRelativa(4) },
-                { id: 2, ean: "7891000654321", nome: "Queijo Minas Frescal 500g", setor: "Laticínios", lote: "LAT-88B", validade: criarDataRelativa(0) },
-                { id: 3, ean: "7891000987654", nome: "Carne Moída Bovina (KG)", setor: "Açougue", lote: "ACQ-02", validade: criarDataRelativa(2) }
-            ];
-        }
-
-        let catalogoEAN = {};
-        try {
-            const catalogoSalvo = localStorage.getItem('mundial_catalogo_ean_lotes_v1');
-            if (catalogoSalvo) {
-                catalogoEAN = JSON.parse(catalogoSalvo);
-            } else {
-                produtos.forEach(p => {
-                    if (p.ean && p.ean !== 'SEM-EAN') {
-                        catalogoEAN[p.ean] = { nome: p.nome, setor: p.setor };
-                    }
+        // Ouvir alterações no Banco de Dados em Tempo Real
+        db.ref('produtos').on('value', (snapshot) => {
+            const data = snapshot.val();
+            produtos = [];
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    produtos.push({ id: key, ...data[key] });
                 });
             }
-        } catch(e) {}
+            renderizarTabela();
+        });
 
-        function salvarNoLocalStorage() {
-            try { 
-                localStorage.setItem('mundial_validades_lotes_v1', JSON.stringify(produtos));
-                localStorage.setItem('mundial_catalogo_ean_lotes_v1', JSON.stringify(catalogoEAN));
-            } catch (e) {}
-        }
+        // Ouvir catálogo de EANs
+        db.ref('catalogoEAN').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                catalogoEAN = data;
+            }
+        });
 
         function verificarMemoriaEAN(ean) {
             const eanLimpo = ean.trim();
@@ -241,6 +232,16 @@
             const tbody = document.getElementById('tabela-produtos');
             if (!tbody) return;
             tbody.innerHTML = '';
+            
+            if (produtos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#64748b; padding:20px;">Nenhum produto cadastrado na nuvem.</td></tr>`;
+                document.getElementById('stat-total').innerText = '0';
+                document.getElementById('stat-warning').innerText = '0';
+                document.getElementById('stat-today').innerText = '0';
+                document.getElementById('stat-expired').innerText = '0';
+                return;
+            }
+
             let total = 0, warning = 0, today = 0, expired = 0;
 
             produtos.sort((a, b) => new Date(a.validade) - new Date(b.validade));
@@ -261,7 +262,7 @@
                         <td><span class="badge ${status.classe}">${status.texto}</span></td>
                         <td style="font-size:12px; color:#475569;"><i class="fa-solid fa-tag" style="color:#dc2626;"></i> ${status.acao}</td>
                         <td style="text-align: right;">
-                            <button onclick="removerProduto(${p.id})" style="background:none; border:none; color:#94a3b8; cursor:pointer; padding:6px;"><i class="fa-solid fa-trash-can"></i></button>
+                            <button onclick="removerProduto('${p.id}')" style="background:none; border:none; color:#94a3b8; cursor:pointer; padding:6px;"><i class="fa-solid fa-trash-can"></i></button>
                         </td>
                     </tr>
                 `;
@@ -349,32 +350,27 @@
             const nomeVal = document.getElementById('input-nome').value.trim();
             const setorVal = document.getElementById('input-setor').value;
             const loteVal = document.getElementById('input-lote').value.trim().toUpperCase() || 'S/ LOTE';
+            const validadeVal = document.getElementById('input-validade').value;
 
             if (eanVal !== 'SEM-EAN') {
-                catalogoEAN[eanVal] = { nome: nomeVal, setor: setorVal };
+                db.ref('catalogoEAN/' + eanVal).set({ nome: nomeVal, setor: setorVal });
             }
 
-            const novoId = produtos.length > 0 ? Math.max(...produtos.map(p => p.id)) + 1 : 1;
-            
-            produtos.push({
-                id: novoId,
+            // Salvar novo registro na nuvem
+            db.ref('produtos').push({
                 ean: eanVal,
                 nome: nomeVal,
                 setor: setorVal,
                 lote: loteVal,
-                validade: document.getElementById('input-validade').value
+                validade: validadeVal
             });
 
-            salvarNoLocalStorage();
             fecharModal();
-            renderizarTabela();
         }
 
         function removerProduto(id) {
-            if (confirm("Confirma a baixa deste item?")) {
-                produtos = produtos.filter(p => p.id !== id);
-                salvarNoLocalStorage();
-                renderizarTabela();
+            if (confirm("Confirma a baixa deste item da nuvem?")) {
+                db.ref('produtos/' + id).remove();
             }
         }
 
@@ -447,10 +443,6 @@
             janelaImpressao.document.write(htmlConteudo);
             janelaImpressao.document.close();
         }
-
-        window.onload = function() {
-            renderizarTabela();
-        };
     </script>
 </body>
 </html>
