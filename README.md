@@ -164,7 +164,7 @@
 
     <!-- Script de Integração com Firebase -->
     <script>
-        // Configuração do Firebase
+        // URL oficial do seu banco de dados Firebase
         const firebaseConfig = {
             databaseURL: "https://validade-mundial-default-rtdb.firebaseio.com/"
         };
@@ -194,6 +194,9 @@
                 });
             }
             renderizarTabela();
+        }, (error) => {
+            console.error("Erro ao ler dados:", error);
+            document.getElementById('tabela-produtos').innerHTML = `<tr><td colspan="7" style="text-align:center; color:#dc2626; padding:20px;">Erro de permissão no Firebase. Verifique se as Regras (Rules) estão definidas como true.</td></tr>`;
         });
 
         // Ouvir catálogo de EANs
@@ -363,9 +366,11 @@
                 setor: setorVal,
                 lote: loteVal,
                 validade: validadeVal
+            }).then(() => {
+                fecharModal();
+            }).catch((err) => {
+                alert("Erro ao salvar na nuvem: Verifique se as Regras (Rules) do Firebase estão como true.");
             });
-
-            fecharModal();
         }
 
         function removerProduto(id) {
